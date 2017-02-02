@@ -2,7 +2,7 @@
  * HttpAnalyzer application
  * ========================
  * This application analyzes HTTP traffic and presents detailed and diverse information about it. It can operate in live traffic
- * mode where this information is collected on live packets or in pcap file mode where packets are being read from a file. The
+ * mode where this information is collected on live packets or in file mode where packets are being read from a pcap/pcapng file. The
  * information collected by this application includes:
  * - general data: number of packets, packet rate, amount of traffic, bandwidth
  * - flow data: number of flow, flow rate, average packets per flow, average data per flow
@@ -19,8 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <algorithm>
-#include <getopt.h>
-#ifndef WIN32 //for using ntohl, ntohs, etc.
+#if !defined(WIN32) && !defined(WINx64) //for using ntohl, ntohs, etc.
 #include <in.h>
 #endif
 #include "PcapLiveDeviceList.h"
@@ -30,6 +29,7 @@
 #include "TablePrinter.h"
 #include "PlatformSpecificUtils.h"
 #include "SystemUtils.h"
+#include <getopt.h>
 
 #define EXIT_WITH_ERROR(reason, ...) do { \
 	printf("\nError: " reason "\n\n", ## __VA_ARGS__); \
@@ -85,7 +85,7 @@ void printUsage()
 			"----------------------\n"
 			"HttpAnalyzer [-h] -f input_file\n"
 			"\nOptions:\n\n"
-			"    -f           : The input pcap file to analyze. Required argument for this mode\n"
+			"    -f           : The input pcap/pcapng file to analyze. Required argument for this mode\n"
 			"    -h           : Displays this help message and exits\n\n"
 			"Usage: Live traffic mode:\n"
 			"-------------------------\n"
@@ -341,20 +341,20 @@ void onApplicationInterrupted(void* cookie)
  */
 void analyzeHttpFromPcapFile(std::string pcapFileName)
 {
-	// open input file
-	PcapFileReaderDevice reader(pcapFileName.c_str());
+	// open input file (pcap or pcapng file)
+	IFileReaderDevice* reader = IFileReaderDevice::getReader(pcapFileName.c_str());
 
-	if (!reader.open())
+	if (!reader->open())
 		EXIT_WITH_ERROR("Could not open input pcap file");
 
 	// set a port 80 filter on the reader device to process only HTTP packets
 	PortFilter httpPortFilter(80, SRC_OR_DST);
-	reader.setFilter(httpPortFilter);
+	reader->setFilter(httpPortFilter);
 
 	// read the input file packet by packet and give it to the HttpStatsCollector for collecting stats
 	HttpStatsCollector collector;
 	RawPacket rawPacket;
-	while(reader.getNextPacket(rawPacket))
+	while(reader->getNextPacket(rawPacket))
 	{
 		Packet parsedPacket(&rawPacket);
 		collector.collectStats(&parsedPacket);
@@ -367,7 +367,10 @@ void analyzeHttpFromPcapFile(std::string pcapFileName)
 	printStatsSummary(collector);
 
 	// close input file
-	reader.close();
+	reader->close();
+
+	// free reader memory
+	delete reader;
 }
 
 

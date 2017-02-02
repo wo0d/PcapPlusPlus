@@ -17,6 +17,9 @@
 #elif MAC_OS_X
 #include <sys/errno.h>
 #endif
+#ifdef _MSC_VER
+#include <SystemUtils.h>
+#endif
 
 
 #define DNS_PORT	    53
@@ -199,6 +202,8 @@ MacAddress NetworkUtils::getMacAddress(IPv4Address ipAddr, PcapLiveDevice* devic
 
 	if (closeDeviceAtTheEnd)
 		device->close();
+	else
+		device->clearFilter();
 
 	result = data.result;
 	arpResponseTimeMS = data.arpResponseTime;
@@ -464,6 +469,8 @@ IPv4Address NetworkUtils::getIPv4Address(std::string hostname, PcapLiveDevice* d
 
 	if (closeDeviceAtTheEnd)
 		device->close();
+	else
+		device->clearFilter();
 
 	result = data.result;
 	dnsResponseTimeMS = data.dnsResponseTime;

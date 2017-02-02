@@ -7,7 +7,7 @@
 #include <string.h>
 #include <sstream>
 #include <algorithm>
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
 #elif MAC_OS_X
@@ -57,7 +57,7 @@ PcapLiveDeviceList::~PcapLiveDeviceList()
 
 void PcapLiveDeviceList::setDnsServers()
 {
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 	FIXED_INFO * fixedInfo;
 	ULONG    ulOutBufLen;
 	DWORD    dwRetVal;
@@ -68,7 +68,7 @@ void PcapLiveDeviceList::setDnsServers()
 	ulOutBufLen = sizeof( FIXED_INFO );
 
 	dwRetVal = GetNetworkParams( fixedInfo, &ulOutBufLen );
-	uint8_t buf2[ulOutBufLen];
+	uint8_t* buf2 = new uint8_t[ulOutBufLen];
 	if(ERROR_BUFFER_OVERFLOW == dwRetVal)
 	{
 		fixedInfo = (FIXED_INFO *)buf2;
@@ -90,8 +90,30 @@ void PcapLiveDeviceList::setDnsServers()
 			pIPAddr = pIPAddr -> Next;
 		}
 	}
+
+	delete[] buf2;
 #elif LINUX
-	std::string command = "nmcli dev list | grep IP4.DNS";
+	// verify that nmcli exist
+	std::string command = "command -v nmcli >/dev/null 2>&1 || { echo 'nmcli not installed'; }";
+	std::string nmcliExists = executeShellCommand(command);
+	if (nmcliExists != "")
+	{
+		LOG_DEBUG("Error retrieving DNS server list: nmcli doesn't exist");
+		return;
+	}
+
+	// check nmcli major version (0 or 1)
+	command = "nmcli -v | awk -F' ' '{print $NF}' | awk -F'.' '{print $1}'";
+	std::string nmcliMajorVer = executeShellCommand(command);
+	nmcliMajorVer.erase(std::remove(nmcliMajorVer.begin(), nmcliMajorVer.end(), '\n'), nmcliMajorVer.end());
+	LOG_DEBUG("Found nmcli. nmcli major version is: '%s'", nmcliMajorVer.c_str());
+
+	// build nmcli command according to its major version
+	if (nmcliMajorVer == "0")
+		command = "nmcli dev list | grep IP4.DNS";
+	else
+		command = "nmcli dev show | grep IP4.DNS";
+
 	std::string dnsServersInfo = executeShellCommand(command);
 	if (dnsServersInfo == "")
 	{

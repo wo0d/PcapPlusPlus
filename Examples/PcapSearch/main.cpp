@@ -1,7 +1,7 @@
 /**
  * PcapSearch application
  * ======================
- * This application searches all pcap files in a given directory and all its sub-directories (unless stated otherwise) and outputs how many and which
+ * This application searches all pcap and pcapng files in a given directory and all its sub-directories (unless stated otherwise) and outputs how many and which
  * packets in those files match a certain pattern given by the user. The pattern is given in Berkeley Packet Filter (BPF) syntax
  * (http://biot.com/capstats/bpf.html). For example: if running the application with the following parameters:
  * PcapSearch.exe -d C:\ -s "ip net 1.1.1.1" -r C:\report.txt
@@ -23,7 +23,6 @@
  */
 
 #include <stdlib.h>
-#include <getopt.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -35,7 +34,7 @@
 #include <RawPacket.h>
 #include <Packet.h>
 #include <PcapFileDevice.h>
-
+#include <getopt.h>
 
 
 using namespace pcpp;
@@ -59,7 +58,7 @@ static struct option PcapSearchOptions[] =
 	} while(0)
 
 
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 #define DIR_SEPARATOR "\\"
 #else
 #define DIR_SEPARATOR "/"
@@ -83,7 +82,7 @@ void printUsage()
 			"    -n                  : Don't include sub-directories (default is include them)\n"
 			"    -s search_criteria  : Criteria to search in Berkeley Packet Filter (BPF) syntax (http://biot.com/capstats/bpf.html) i.e: 'ip net 1.1.1.1'\n"
 			"    -r file_name        : Write a detailed search report to a file\n"
-			"    -e extension_list   : Set file extensions to search. The default is searching '.pcap' files only.\n"
+			"    -e extension_list   : Set file extensions to search. The default is searching '.pcap' and '.pcapng' files.\n"
 			"                          extnesions_list should be a comma-separated list of extensions, for example: pcap,net,dmp\n"
 			"    -h                  : Displays this help message and exits\n");
 	exit(0);
@@ -104,11 +103,11 @@ std::string getExtension(std::string fileName)
  */
 int searchPcap(std::string pcapFilePath, std::string searchCriteria, std::ofstream* detailedReportFile)
 {
-	// create the pcap reader
-	PcapFileReaderDevice reader(pcapFilePath.c_str());
+	// create the pcap/pcap-ng reader
+	IFileReaderDevice* reader = IFileReaderDevice::getReader(pcapFilePath.c_str());
 
 	// if the reader fails to open
-	if (!reader.open())
+	if (!reader->open())
 	{
 		if (detailedReportFile != NULL)
 		{
@@ -120,12 +119,16 @@ int searchPcap(std::string pcapFilePath, std::string searchCriteria, std::ofstre
 			(*detailedReportFile) << errorStr << std::endl;
 		}
 
+		// free the reader memory and return
+		delete reader;
 		return 0;
 	}
 
 	// set the filter for the file so only packets that match the search criteria will be read
-	if (!reader.setFilter(searchCriteria))
+	if (!reader->setFilter(searchCriteria))
 	{
+		// free the reader memory and return
+		delete reader;
 		return 0;
 	}
 
@@ -138,7 +141,7 @@ int searchPcap(std::string pcapFilePath, std::string searchCriteria, std::ofstre
 	RawPacket rawPacket;
 
 	// read packets from the file. Since we already set the filter, only packets that matches the filter will be read
-	while (reader.getNextPacket(rawPacket))
+	while (reader->getNextPacket(rawPacket))
 	{
 		// if a detailed report is required, parse the packet and print it to the report file
 		if (detailedReportFile != NULL)
@@ -159,7 +162,7 @@ int searchPcap(std::string pcapFilePath, std::string searchCriteria, std::ofstre
 	}
 
 	// close the reader file
-	reader.close();
+	reader->close();
 
 	// finalize the report
 	if (detailedReportFile != NULL)
@@ -170,6 +173,9 @@ int searchPcap(std::string pcapFilePath, std::string searchCriteria, std::ofstre
 		(*detailedReportFile) << "    ----> Found " << packetCount << " packets" << std::endl << std::endl;
 
 	}
+
+	// free the reader memory
+	delete reader;
 
 	// return how many packets matched the search criteria
 	return packetCount;
@@ -283,8 +289,9 @@ int main(int argc, char* argv[])
 
 	std::map<std::string, bool> extensionsToSearch;
 
-	// the default (unless set otherwise) is to search in '.pcap' extension only
+	// the default (unless set otherwise) is to search in '.pcap' and '.pcapng' extensions
 	extensionsToSearch["pcap"] = true;
+	extensionsToSearch["pcapng"] = true;
 
 	int optionIndex = 0;
 	char opt = 0;

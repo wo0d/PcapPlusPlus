@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Splitters.h"
+#include "PcapDevice.h"
 
 /**
  * Splits a pcap file by number of packets
@@ -63,8 +64,8 @@ public:
 class FileSizeSplitter : public Splitter
 {
 private:
-	int m_TotalSize;
-	int m_MaxBytesPerFile;
+	uint64_t m_TotalSize;
+	uint64_t m_MaxBytesPerFile;
 
 	static const int PCAP_FILE_HEADER_SIZE = 24;   // == sizeof(pcap_file_header)
 	static const int PCAP_PACKET_HEADER_SIZE = 16; // == sizeof(pcap_pkthdr)
@@ -74,7 +75,7 @@ public:
 	/**
 	 * A c'tor for this class which gets the file size in bytes for each split file
 	 */
-	FileSizeSplitter(int maxBytesPerFile)
+	FileSizeSplitter(uint64_t maxBytesPerFile)
 	{
 		m_TotalSize = 0;
 		// each file size contains a pcap header with size of PCAP_FILE_HEADER_SIZE
@@ -90,7 +91,7 @@ public:
 		// check the current file
 		int prevFile = m_TotalSize / m_MaxBytesPerFile;
 		// add the current packet size and packet header
-		m_TotalSize += packet.getRawPacket()->getRawDataLen() + PCAP_PACKET_HEADER_SIZE;
+		m_TotalSize += (uint64_t)packet.getRawPacket()->getRawDataLen() + PCAP_PACKET_HEADER_SIZE;
 		// calculate the new file number
 		int nextFile = m_TotalSize / m_MaxBytesPerFile;
 		// if reached the maximum size per file, close the previous file
@@ -113,4 +114,49 @@ public:
 		return true;
 	}
 
+};
+
+
+/**
+ * Splits a pcap file into two files: one that contains all packets matching a given BPF filter and one that contains the rest
+ * of the packets
+ */
+class BpfCriteriaSplitter : public Splitter
+{
+private:
+	std::string m_BpfFilter;
+
+public:
+	BpfCriteriaSplitter(std::string bpfFilter)
+	{
+		m_BpfFilter = bpfFilter;
+	}
+
+	/**
+	 * Return file #0 if packet matches the BPF filer, and file #1 if it's not
+	 */
+	int getFileNumber(pcpp::Packet& packet, std::vector<int>& filesToClose)
+	{
+		if (pcpp::IPcapDevice::matchPakcetWithFilter(m_BpfFilter, packet.getRawPacket()))
+			return 0;
+		return 1;
+	}
+
+	/**
+	 * Verifies the BPF filter set in the c'tor is a valid BPF filter
+	 */
+	bool isSplitterParamLegal(std::string& errorString)
+	{
+		if (m_BpfFilter == "")
+		{
+			errorString = "No BPF filter was set or set an empty one";
+			return false;
+		}
+
+		bool filterValid = pcpp::IPcapDevice::verifyFilter(m_BpfFilter);
+		if (!filterValid)
+			errorString = "BPF filter is not valid";
+
+		return filterValid;
+	}
 };

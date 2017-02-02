@@ -3,10 +3,16 @@
 #include <Packet.h>
 #include <EthLayer.h>
 #include <SllLayer.h>
+#include <NullLoopbackLayer.h>
 #include <Logger.h>
 #include <string.h>
 #include <typeinfo>
 #include <sstream>
+#ifdef _MSC_VER
+#include <time.h>
+#include <SystemUtils.h>
+#endif
+
 
 namespace pcpp
 {
@@ -36,9 +42,13 @@ void Packet::setRawPacket(RawPacket* rawPacket, bool freeRawPacket)
 	m_MaxPacketLen = rawPacket->getRawDataLen();
 	m_FreeRawPacket = freeRawPacket;
 	m_RawPacket = rawPacket;
-	if(m_RawPacket && m_RawPacket->getLinkLayerType() == LINKTYPE_LINUX_SLL)
+	if (m_RawPacket && m_RawPacket->getLinkLayerType() == LINKTYPE_LINUX_SLL)
 	{
 		m_FirstLayer = new SllLayer((uint8_t*)m_RawPacket->getRawData(), m_RawPacket->getRawDataLen(), this);
+	}
+	else if (m_RawPacket && m_RawPacket->getLinkLayerType() == LINKTYPE_NULL)
+	{
+		m_FirstLayer = new NullLoopbackLayer((uint8_t*)m_RawPacket->getRawData(), m_RawPacket->getRawDataLen(), this);
 	}
 	else
 	{
@@ -325,8 +335,9 @@ bool Packet::extendLayer(Layer* layer, int offsetInLayer, size_t numOfBytesToExt
 
 	// insert layer data to raw packet
 	int indexToInsertData = layer->m_Data + offsetInLayer - m_RawPacket->getRawData();
-	uint8_t tempData[numOfBytesToExtend];
+	uint8_t* tempData = new uint8_t[numOfBytesToExtend];
 	m_RawPacket->insertData(indexToInsertData, tempData, numOfBytesToExtend);
+	delete[] tempData;
 
 	// re-calculate all layers data ptr and data length
 	const uint8_t* dataPtr = m_RawPacket->getRawData();
@@ -415,15 +426,21 @@ std::string Packet::printPacketInfo(bool timeAsLocalTime)
 	// convert raw packet timestamp to printable format
 	timeval timestamp = m_RawPacket->getPacketTimeStamp();
 	time_t nowtime = timestamp.tv_sec;
-	struct tm *nowtm;
+	struct tm *nowtm = NULL;
 	if (timeAsLocalTime)
 		nowtm = localtime(&nowtime);
 	else
 		nowtm = gmtime(&nowtime);
-	char tmbuf[64], buf[64];
-	strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
-	snprintf(buf, sizeof buf, "%s.%06lu", tmbuf, timestamp.tv_usec);
 
+	char tmbuf[64], buf[64];
+	if (nowtm != NULL)
+	{
+		strftime(tmbuf, sizeof(tmbuf), "%Y-%m-%d %H:%M:%S", nowtm);
+		snprintf(buf, sizeof(buf), "%s.%06lu", tmbuf, timestamp.tv_usec);
+	}
+	else
+		snprintf(buf, sizeof(buf), "0000-00-00 00:00:00.000000");
+	
 	return "Packet length: " + dataLenStream.str() + " [Bytes], Arrival time: " + std::string(buf);
 }
 

@@ -3,7 +3,11 @@
 
 #include <Layer.h>
 #include <IPv4Layer.h>
+#ifdef _MSC_VER
+#include <Winsock2.h>
+#else
 #include <sys/time.h>
+#endif
 #include <vector>
 
 
@@ -144,7 +148,7 @@ namespace pcpp
 		/** a pointer to the header data */
 		icmp_echo_hdr* header;
 		/** most echo requests/replies contain some payload data. This is the data length */
-		uint8_t dataLength;
+		size_t dataLength;
 		/** most echo requests/replies contain some payload data. This is a pointer to this data */
 		uint8_t* data;
 	} icmp_echo_request;

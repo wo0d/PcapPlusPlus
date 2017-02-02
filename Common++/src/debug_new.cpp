@@ -11,16 +11,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 #include <malloc.h>
 
 #ifdef _MSC_VER
 #pragma warning(disable: 4073)
 #pragma init_seg(lib)
-#endif
-
+#include <process.h>
+typedef int pid_t;
+#define popen(cmd, mode) _popen(cmd, mode)
+#define pclose(x) _pclose(x)
+#define getpid() _getpid()
+#include <intrin.h>
+#define _DEBUG_NEW_CALLER_ADDRESS _ReturnAddress()
+#else
 #define _DEBUG_NEW_CALLER_ADDRESS __builtin_return_address(0)
-
+#endif
 
 #ifndef DEBUG_NEW_HASHTABLESIZE
 #define DEBUG_NEW_HASHTABLESIZE 16384
@@ -126,7 +134,7 @@ static void getpmaps(pid_t  pid)
         }
 
         /*init the allocated memory*/
-           memset(line, sizeof(pmap_line_t), 0);
+           memset(line, 0, sizeof(pmap_line_t));
 
         /*parse the line */
             sscanf(buf, "%lx-%lx %4s %lx %02x:%02x %d %s",

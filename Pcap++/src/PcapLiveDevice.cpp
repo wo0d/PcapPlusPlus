@@ -2,6 +2,9 @@
 
 #include <PcapLiveDevice.h>
 #include <PcapLiveDeviceList.h>
+#ifndef  _MSC_VER
+#include <unistd.h>
+#endif // ! _MSC_VER
 #include <pthread.h>
 #include <Logger.h>
 #include <PlatformSpecificUtils.h>
@@ -10,9 +13,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <unistd.h>
 #include <IpUtils.h>
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 #include <ws2tcpip.h>
 #include <Packet32.h>
 #include <ntddndis.h>
@@ -101,6 +103,8 @@ PcapLiveDevice::PcapLiveDevice(pcap_if_t* pInterface, bool calculateMTU, bool ca
 	memset(m_StatsThread, 0, sizeof(PcapThread));
 	m_cbOnPacketArrives = NULL;
 	m_cbOnStatsUpdate = NULL;
+	m_cbOnPacketArrivesBlockingMode = NULL;
+	m_cbOnPacketArrivesBlockingModeUserCookie = NULL;
 	m_IntervalToUpdateStats = 0;
 	m_cbOnPacketArrivesUserCookie = NULL;
 	m_cbOnStatsUpdateUserCookie = NULL;
@@ -142,6 +146,22 @@ void PcapLiveDevice::onPacketArrivesNoCallback(uint8_t *user, const struct pcap_
 	memcpy(packetData, packet, pkthdr->caplen);
 	RawPacket* rawPacketPtr = new RawPacket(packetData, pkthdr->caplen, pkthdr->ts, true, LINKTYPE_ETHERNET);
 	pThis->m_CapturedPackets->pushBack(rawPacketPtr);
+}
+
+void PcapLiveDevice::onPacketArrivesBlockingMode(uint8_t *user, const struct pcap_pkthdr *pkthdr, const uint8_t *packet)
+{
+	PcapLiveDevice* pThis = (PcapLiveDevice*)user;
+	if (pThis == NULL)
+	{
+		LOG_ERROR("Unable to extract PcapLiveDevice instance");
+		return;
+	}
+
+	RawPacket rawPacket(packet, pkthdr->caplen, pkthdr->ts, false, LINKTYPE_ETHERNET);
+
+	if (pThis->m_cbOnPacketArrivesBlockingMode != NULL)
+		if (pThis->m_cbOnPacketArrivesBlockingMode(&rawPacket, pThis, pThis->m_cbOnPacketArrivesBlockingModeUserCookie))
+			pThis->m_StopThread = true;
 }
 
 void* PcapLiveDevice::captureThreadMain(void *ptr)
@@ -220,8 +240,15 @@ void PcapLiveDevice::close()
 		LOG_DEBUG("Device '%s' already closed", m_Name);
 		return;
 	}
+
+	bool sameDescriptor = (m_PcapDescriptor == m_PcapSendDescriptor);
 	pcap_close(m_PcapDescriptor);
-	pcap_close(m_PcapSendDescriptor);
+	LOG_DEBUG("Receive pcap descriptor closed");
+	if (!sameDescriptor)
+	{ 
+		pcap_close(m_PcapSendDescriptor);
+		LOG_DEBUG("Send pcap descriptor closed");
+	}
 	LOG_DEBUG("Device '%s' closed", m_Name);
 }
 
@@ -298,12 +325,73 @@ bool PcapLiveDevice::startCapture(RawPacketVector& capturedPacketsVector)
 	return true;
 }
 
+
+int PcapLiveDevice::startCaptureBlockingMode(OnPacketArrivesStopBlocking onPacketArrives, void* userCookie, int timeout)
+{
+	if (m_CaptureThreadStarted || m_PcapDescriptor == NULL)
+	{
+		LOG_ERROR("Device '%s' already capturing or not opened", m_Name);
+		return 0;
+	}
+
+	m_cbOnPacketArrives = NULL;
+	m_cbOnStatsUpdate = NULL;
+	m_cbOnPacketArrivesUserCookie = NULL;
+	m_cbOnStatsUpdateUserCookie = NULL;
+
+	m_cbOnPacketArrivesBlockingMode = onPacketArrives;
+	m_cbOnPacketArrivesBlockingModeUserCookie = userCookie;
+
+	clock_t startTime = clock();
+	double diffSec = 0;
+
+	m_CaptureThreadStarted = true;
+	m_StopThread = false;
+
+	if (timeout <= 0)
+	{
+		while (!m_StopThread)
+		{
+			pcap_dispatch(m_PcapDescriptor, -1, onPacketArrivesBlockingMode, (uint8_t*)this);
+		}
+		diffSec = timeout;
+	}
+	else
+	{
+
+		while (!m_StopThread && diffSec <= (double)timeout)
+		{
+			pcap_dispatch(m_PcapDescriptor, -1, onPacketArrivesBlockingMode, (uint8_t*)this);
+			double diffTicks = clock() - startTime;
+			diffSec = diffTicks/CLOCKS_PER_SEC;
+		}
+	}
+
+	m_CaptureThreadStarted = false;
+
+	m_StopThread = false;
+
+	m_cbOnPacketArrivesBlockingMode = NULL;
+	m_cbOnPacketArrivesBlockingModeUserCookie = NULL;
+
+	if (diffSec > (double)timeout)
+		return -1;
+	return 1;
+}
+
 void PcapLiveDevice::stopCapture()
 {
+	// in blocking mode stop capture isn't relevant
+	if (m_cbOnPacketArrivesBlockingMode != NULL)
+		return;
+
 	m_StopThread = true;
-	LOG_DEBUG("Stopping capture thread, waiting for it to join...");
-	pthread_join(m_CaptureThread->pthread, NULL);
-	m_CaptureThreadStarted = false;
+	if (m_CaptureThreadStarted)
+	{
+		LOG_DEBUG("Stopping capture thread, waiting for it to join...");
+		pthread_join(m_CaptureThread->pthread, NULL);
+		m_CaptureThreadStarted = false;
+	}
 	LOG_DEBUG("Capture thread stopped for device '%s'", m_Name);
 	if (m_StatsThreadStarted)
 	{
@@ -312,6 +400,7 @@ void PcapLiveDevice::stopCapture()
 		m_StatsThreadStarted = false;
 		LOG_DEBUG("Stats thread stopped for device '%s'", m_Name);
 	}
+
 	PCAP_SLEEP(1);
 	m_StopThread = false;
 }
@@ -421,7 +510,7 @@ std::string PcapLiveDevice::printThreadId(PcapThread* id)
 
 void PcapLiveDevice::setDeviceMtu()
 {
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 
 	uint32_t mtuValue = 0;
 	LPADAPTER adapter = PacketOpenAdapter((char*)m_Name);
@@ -476,7 +565,7 @@ void PcapLiveDevice::setDeviceMtu()
 
 void PcapLiveDevice::setDeviceMacAddress()
 {
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 
 	LPADAPTER adapter = PacketOpenAdapter((char*)m_Name);
 	if (adapter == NULL)
@@ -560,14 +649,14 @@ void PcapLiveDevice::setDeviceMacAddress()
 
 void PcapLiveDevice::setDefaultGateway()
 {
-#ifdef WIN32
+#if defined(WIN32) || defined(WINx64)
 	ULONG outBufLen = sizeof (IP_ADAPTER_INFO);
-	uint8_t buffer[outBufLen];
+	uint8_t* buffer = new uint8_t[outBufLen];
 	PIP_ADAPTER_INFO adapterInfo = (IP_ADAPTER_INFO*)buffer;
 	DWORD retVal = 0;
 
 	retVal = GetAdaptersInfo(adapterInfo, &outBufLen);
-	uint8_t buffer2[outBufLen];
+	uint8_t* buffer2 = new uint8_t[outBufLen];
     if (retVal == ERROR_BUFFER_OVERFLOW)
         adapterInfo = (IP_ADAPTER_INFO *)buffer2;
 
@@ -589,6 +678,9 @@ void PcapLiveDevice::setDefaultGateway()
 	{
 		LOG_ERROR("Error retrieving default gateway address");
 	}
+
+	delete[] buffer;
+	delete[] buffer2;
 #elif LINUX
 	std::ifstream routeFile("/proc/net/route");
 	std::string line;

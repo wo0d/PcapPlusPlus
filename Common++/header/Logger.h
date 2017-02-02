@@ -43,6 +43,8 @@ namespace pcpp
 		PacketLogModuleGreLayer, ///< GreLayer module (Packet++)
 		PacketLogModuleSSLLayer, ///< SSLLayer module (Packet++)
 		PacketLogModuleSllLayer, ///< SllLayer module (Packet++)
+		PacketLogModuleDhcpLayer, ///< DhcpLayer module (Packet++)
+		PacketLogModuleIgmpLayer, ///< IgmpLayer module (Packet++)
 		PcapLogModuleWinPcapLiveDevice, ///< WinPcapLiveDevice module (Pcap++)
 		PcapLogModuleRemoteDevice, ///< WinPcapRemoteDevice module (Pcap++)
 		PcapLogModuleLiveDevice, ///< PcapLiveDevice module (Pcap++)

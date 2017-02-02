@@ -72,7 +72,12 @@ namespace pcpp
 		 * @param[in] filterAsString The filter to be set in Berkeley Packet Filter (BPF) syntax (http://biot.com/capstats/bpf.html)
 		 * @return True if filter set successfully, false otherwise
 		 */
-		bool setFilter(std::string filterAsString);
+		virtual bool setFilter(std::string filterAsString);
+
+		/**
+		 * Clear the filter currently set on device
+		 */
+		void clearFilter();
 
 		/**
 		 * Verify a filter is valid
@@ -80,6 +85,15 @@ namespace pcpp
 		 * @return True if the filter is valid or false otherwise
 		 */
 		static bool verifyFilter(std::string filterAsString);
+
+		/**
+		 * Match a raw packet with a given BPF filter. Notice this method is static which means you don't need any device instance
+		 * in order to perform this match
+		 * @param[in] filterAsString The BPF filter
+		 * @param[in] rawPacket A pointer to the raw packet to match the BPF filter with
+		 * @return True if raw packet matches the BPF filter or false otherwise
+		 */
+		static bool matchPakcetWithFilter(std::string filterAsString, RawPacket* rawPacket);
 	};
 
 } // namespace pcpp
