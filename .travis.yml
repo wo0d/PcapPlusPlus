@@ -41,5 +41,5 @@ script:
   - Bin/Packet++Test
   - cd ../Pcap++Test
   - sudo Bin/Pcap++Test -n
-  - cd ..
+  - cd ../..
   - bash Deploy/deploy-travis.sh

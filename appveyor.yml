@@ -47,3 +47,7 @@ test_script:
 - Bin\Packet++Test.exe
 - cd ..\Pcap++Test
 - Bin\Pcap++Test.exe -n
+- cd ..\..
+- if "%compiler%"=="mingw32" Deploy\deploy-mingw.bat
+- if "%compiler%"=="mingw-w64" Deploy\deploy-mingw.bat
+- if "%compiler%"=="vs2015" Deploy\deploy-vs2015.bat
