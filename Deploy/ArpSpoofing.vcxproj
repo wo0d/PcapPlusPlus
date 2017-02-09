@@ -75,23 +75,23 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(PcapPlusPlusHome)\Dist\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(PcapPlusPlusHome)\Dist;$(PThreadWin32Home)\Pre-built.2\lib\x86;$(WinPcapHome)\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(PcapPlusPlusHome)\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(PcapPlusPlusHome)\x86\Debug;$(PThreadWin32Home)\Pre-built.2\lib\x86;$(WinPcapHome)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(PcapPlusPlusHome)\Dist\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(PcapPlusPlusHome)\Dist;$(PThreadWin32Home)\Pre-built.2\lib\x64;$(WinPcapHome)\Lib\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(PcapPlusPlusHome)\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(PcapPlusPlusHome)\x64\Debug;$(PThreadWin32Home)\Pre-built.2\lib\x64;$(WinPcapHome)\Lib\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(PcapPlusPlusHome)\Dist\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(PcapPlusPlusHome)\Dist;$(PThreadWin32Home)\Pre-built.2\lib\x86;$(WinPcapHome)\Lib;$(LibraryPath)</LibraryPath>
+    <IncludePath>$(PcapPlusPlusHome)\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(PcapPlusPlusHome)\x86\Release;$(PThreadWin32Home)\Pre-built.2\lib\x86;$(WinPcapHome)\Lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(PcapPlusPlusHome)\Dist\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(PcapPlusPlusHome)\Dist;$(PThreadWin32Home)\Pre-built.2\lib\x64;$(WinPcapHome)\Lib;$(LibraryPath)\x64</LibraryPath>
+    <IncludePath>$(PcapPlusPlusHome)\header;$(WinPcapHome)\Include;$(PThreadWin32Home)\Pre-built.2\include;$(IncludePath)</IncludePath>
+    <LibraryPath>$(PcapPlusPlusHome)\x64\Release;$(PThreadWin32Home)\Pre-built.2\lib\x64;$(WinPcapHome)\Lib;$(LibraryPath)\x64</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
